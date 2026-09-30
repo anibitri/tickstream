@@ -155,6 +155,10 @@ func (l *Loop) Run(ctx context.Context) error {
 	l.pending = make(Offsets)
 	l.mu.Unlock()
 	ticker, _ := l.Handler.(Ticker)
+	// Rebalances are blocked while a batch is being handled. If Run returns
+	// mid-batch (a handler error), unblock them, or closing the client would
+	// wait forever to leave the group and the process would never exit.
+	defer l.Client.AllowRebalance()
 	for {
 		pollCtx, cancel := context.WithTimeout(ctx, l.PollTimeout)
 		fetches := l.Client.PollRecords(pollCtx, l.MaxRecords)
