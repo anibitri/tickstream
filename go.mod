@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sns v1.47.2
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/coder/websocket v1.8.15
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/shopspring/decimal v1.4.0

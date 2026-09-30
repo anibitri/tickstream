@@ -85,8 +85,11 @@ func Setup(ctx context.Context, service string, cfg config.Common) (*Obs, error)
 	return o, nil
 }
 
-// Serve starts the observability HTTP server in the background. Services that
-// run their own HTTP server (api-gateway) mount Handler routes instead.
+// Handler serves /metrics, /healthz and /readyz (api-gateway also mounts it on
+// its public port).
+func (o *Obs) Handler() http.Handler { return o.server.Handler }
+
+// Serve starts the /metrics, /healthz and /readyz server in the background.
 func (o *Obs) Serve() {
 	go func() {
 		if err := o.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

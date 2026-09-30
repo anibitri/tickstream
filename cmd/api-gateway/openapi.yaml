@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: Tickstream API
+  version: 1.0.0
+  description: |
+    Live market metrics, alert history, feed health and backtest reports.
+    Times are nanoseconds since the Unix epoch (UTC). Prices, VWAPs and
+    volumes are decimal strings so no precision is lost.
+
+    Live updates are pushed over a websocket at `GET /ws?symbols=BTC-USD,ETH-USD`
+    (omit `symbols` for all). Each message is `{"type": "metrics" | "alert" |
+    "health", "data": <Metrics | Alert | FeedHealth>}`. Slow clients may miss
+    old metrics messages, never alerts.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/symbols:
+    get:
+      summary: Configured symbols and the health of each exchange feed
+      operationId: listSymbols
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SymbolInfo" }
+  /api/v1/metrics/{symbol}:
+    get:
+      summary: Latest closed window for a symbol
+      operationId: getLatestMetrics
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+        - $ref: "#/components/parameters/Window"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Metrics" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/metrics/{symbol}/history:
+    get:
+      summary: Recent windows kept in memory by the gateway (oldest first)
+      operationId: getMetricsHistory
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+        - $ref: "#/components/parameters/Window"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 600, default: 300 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Metrics" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/v1/alerts:
+    get:
+      summary: Alert history, newest first
+      description: |
+        With `symbol`, results can be paged with `cursor` (use `next_cursor`
+        from the previous page). Without `symbol`, the newest alerts of all
+        symbols are merged and paging is not available.
+      operationId: listAlerts
+      parameters:
+        - name: symbol
+          in: query
+          schema: { type: string, example: BTC-USD }
+        - name: since
+          in: query
+          description: Only alerts for windows ending at or after this time (ns).
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertPage" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/v1/backtests:
+    get:
+      summary: IDs of stored backtest runs
+      operationId: listBacktests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs: { type: array, items: { type: string } }
+  /api/v1/backtests/{run_id}:
+    get:
+      summary: A backtest report (the report.json written by the backtester)
+      operationId: getBacktest
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "404": { $ref: "#/components/responses/Error" }
+  /healthz:
+    get:
+      summary: Liveness
+      responses: { "200": { description: Process is running } }
+  /readyz:
+    get:
+      summary: Readiness
+      responses:
+        "200": { description: Ready to serve }
+        "503": { description: Starting up }
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses: { "200": { description: Prometheus text format } }
+components:
+  parameters:
+    Symbol:
+      name: symbol
+      in: path
+      required: true
+      schema: { type: string, example: BTC-USD }
+    Window:
+      name: window
+      in: query
+      description: Window size in seconds.
+      schema: { type: integer, enum: [1, 10, 60], default: 10 }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+  schemas:
+    ExchangeStats:
+      type: object
+      required: [exchange, vwap, volume, trade_count, last_trade_ns]
+      properties:
+        exchange: { type: string }
+        vwap: { type: string }
+        volume: { type: string }
+        trade_count: { type: integer }
+        last_trade_ns: { type: integer, format: int64 }
+    Metrics:
+      type: object
+      required: [symbol, window_secs, window_start_ns, window_end_ns, vwap, volume, trade_count,
+        realised_vol, high, low, last_price, xex_spread_bps, emitted_at_ns, exchanges]
+      properties:
+        symbol: { type: string }
+        window_secs: { type: integer, enum: [1, 10, 60] }
+        window_start_ns: { type: integer, format: int64 }
+        window_end_ns: { type: integer, format: int64 }
+        vwap: { type: string, description: Volume-weighted average price }
+        volume: { type: string }
+        trade_count: { type: integer }
+        realised_vol: { type: number, description: Annualised volatility of the window (1.0 = 100%) }
+        high: { type: string }
+        low: { type: string }
+        last_price: { type: string }
+        xex_spread_bps: { type: number, description: "Coinbase VWAP minus Kraken VWAP, in basis points" }
+        emitted_at_ns: { type: integer, format: int64 }
+        exchanges:
+          type: array
+          items: { $ref: "#/components/schemas/ExchangeStats" }
+    Alert:
+      type: object
+      required: [symbol, alert_id, rule_name, severity, window_end_ns, message, values]
+      properties:
+        symbol: { type: string }
+        alert_id: { type: string }
+        rule_name: { type: string }
+        severity: { type: string, enum: [INFO, WARN, CRITICAL] }
+        window_end_ns: { type: integer, format: int64 }
+        exchange: { type: string, description: Set for per-exchange rules such as stale_feed }
+        message: { type: string }
+        values:
+          type: object
+          additionalProperties: { type: number }
+    AlertPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Alert" }
+        next_cursor: { type: string }
+    FeedHealth:
+      type: object
+      required: [exchange, symbol, last_trade_ns, reconnects, status, reported_at_ns]
+      properties:
+        exchange: { type: string }
+        symbol: { type: string }
+        last_trade_ns: { type: integer, format: int64 }
+        reconnects: { type: integer }
+        status: { type: string, enum: [connected, reconnecting, stale, unknown] }
+        reported_at_ns: { type: integer, format: int64 }
+    SymbolInfo:
+      type: object
+      required: [symbol, feeds]
+      properties:
+        symbol: { type: string }
+        feeds:
+          type: array
+          items: { $ref: "#/components/schemas/FeedHealth" }
