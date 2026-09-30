@@ -231,6 +231,29 @@ func (l *Loop) commit(ctx context.Context) error {
 	return nil
 }
 
+// topicIDs caches topic name -> ID. OffsetCommit v10+ (Kafka 4) identifies
+// topics by ID rather than by name.
+var topicIDs sync.Map
+
+func topicID(ctx context.Context, cl *kgo.Client, topic string) ([16]byte, error) {
+	if id, ok := topicIDs.Load(topic); ok {
+		return id.([16]byte), nil
+	}
+	details, err := kadm.NewClient(cl).ListTopics(ctx, topic)
+	if err != nil {
+		return [16]byte{}, err
+	}
+	d, ok := details[topic]
+	if !ok {
+		return [16]byte{}, fmt.Errorf("topic %s not found", topic)
+	}
+	if d.Err != nil {
+		return [16]byte{}, fmt.Errorf("look up topic %s: %w", topic, d.Err)
+	}
+	topicIDs.Store(topic, [16]byte(d.ID))
+	return d.ID, nil
+}
+
 // CommitWithMetadata issues an OffsetCommit for the current group generation,
 // including per-partition metadata (franz-go's high-level commit API does not
 // expose the metadata field).
@@ -243,6 +266,11 @@ func CommitWithMetadata(ctx context.Context, cl *kgo.Client, group string, offs 
 	for t, ps := range offs {
 		rt := kmsg.NewOffsetCommitRequestTopic()
 		rt.Topic = t
+		id, err := topicID(ctx, cl, t)
+		if err != nil {
+			return err
+		}
+		rt.TopicID = id
 		for p, c := range ps {
 			if c.Offset < 0 {
 				continue
