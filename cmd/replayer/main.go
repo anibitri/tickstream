@@ -187,7 +187,7 @@ func run(ctx context.Context, o *observability.Obs, cl *kgo.Client, r *replay.Re
 		if err := pacer.Wait(ctx, t.EventTimeNs); err != nil {
 			return err
 		}
-		rec, err := kafkax.ProtoRecord(f.topic, t.Symbol, t, t.EventTimeNs)
+		rec, err := kafkax.ProtoRecord(f.topic, t.Symbol, t)
 		if err != nil {
 			return err
 		}

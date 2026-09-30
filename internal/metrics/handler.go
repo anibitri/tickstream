@@ -167,7 +167,7 @@ func (h *Handler) Tick(ctx context.Context) ([]*kgo.Record, error) {
 
 func (h *Handler) record(ctx context.Context, e Emitted, triggerRecvNs int64) (*kgo.Record, error) {
 	m := e.Metrics
-	rec, err := kafkax.ProtoRecord(h.OutTopic, m.Symbol, m, m.WindowEndNs)
+	rec, err := kafkax.ProtoRecord(h.OutTopic, m.Symbol, m)
 	if err != nil {
 		return nil, err
 	}

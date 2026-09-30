@@ -55,7 +55,6 @@ func TestHandleNormalisesDedupsAndDeadLetters(t *testing.T) {
 			var tr domain.Trade
 			require.NoError(t, proto.Unmarshal(r.Value, &tr))
 			assert.Equal(t, tr.Symbol, string(r.Key), "keyed by symbol")
-			assert.Equal(t, tr.EventTimeNs/1e6, r.Timestamp.UnixMilli(), "record timestamp is event time")
 			trades = append(trades, &tr)
 		case "dlq.normaliser":
 			var d domain.DeadLetter

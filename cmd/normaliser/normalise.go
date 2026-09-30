@@ -60,7 +60,7 @@ func (h *Handler) Handle(ctx context.Context, recs []*kgo.Record) ([]*kgo.Record
 				observability.DuplicatesDropped.WithLabelValues("normaliser").Inc()
 				continue
 			}
-			rec, err := kafkax.ProtoRecord(h.TradesTopic, t.Symbol, t, t.EventTimeNs)
+			rec, err := kafkax.ProtoRecord(h.TradesTopic, t.Symbol, t)
 			if err != nil {
 				return nil, err
 			}

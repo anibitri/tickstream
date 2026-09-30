@@ -187,7 +187,7 @@ func (f *Feed) onConnected(ctx context.Context, disconnectedAtNs, nowNs int64) {
 			Message:     fmt.Sprintf("%s feed for %s was disconnected for %.1fs", name, sym, gap.Seconds()),
 			Values:      map[string]float64{"gap_secs": gap.Seconds()},
 		}
-		if r, err := kafkax.ProtoRecord(f.AlertsTopic, sym, a, nowNs); err == nil {
+		if r, err := kafkax.ProtoRecord(f.AlertsTopic, sym, a); err == nil {
 			f.Publish(ctx, r)
 		}
 	}
@@ -195,7 +195,7 @@ func (f *Feed) onConnected(ctx context.Context, disconnectedAtNs, nowNs int64) {
 
 func (f *Feed) publishRaw(ctx context.Context, symbol string, payload []byte, recvNs int64) {
 	name := f.Adapter.Name()
-	r := &kgo.Record{Topic: f.RawTopic, Key: []byte(symbol), Value: payload, Timestamp: time.Unix(0, recvNs)}
+	r := &kgo.Record{Topic: f.RawTopic, Key: []byte(symbol), Value: payload}
 	kafkax.SetHeader(r, kafkax.HeaderRecvTimeNs, strconv.FormatInt(recvNs, 10))
 	kafkax.SetHeader(r, kafkax.HeaderExchange, name)
 	if f.Tracer != nil {
@@ -248,7 +248,7 @@ func (f *Feed) ReportHealth(ctx context.Context, interval time.Duration) {
 			return
 		case <-t.C:
 			for _, h := range f.Health() {
-				if r, err := kafkax.ProtoRecord(f.HealthTopic, h.Symbol, h, h.ReportedAtNs); err == nil {
+				if r, err := kafkax.ProtoRecord(f.HealthTopic, h.Symbol, h); err == nil {
 					f.Publish(ctx, r)
 				}
 			}

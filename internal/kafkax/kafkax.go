@@ -119,18 +119,16 @@ func HeaderInt64(r *kgo.Record, key string) int64 {
 	return v
 }
 
-// ProtoRecord marshals msg into a record for topic keyed by key. The record
-// timestamp is set to tsNs (event time) so Kafka time indexes follow event time.
-func ProtoRecord(topic, key string, msg proto.Message, tsNs int64) (*kgo.Record, error) {
+// ProtoRecord marshals msg into a record for topic, keyed by key (the symbol).
+// The Kafka timestamp is left to the producer (time of sending): event time
+// lives in the message itself. Using event time as the Kafka timestamp would
+// make replays of old data expire immediately under time-based retention.
+func ProtoRecord(topic, key string, msg proto.Message) (*kgo.Record, error) {
 	b, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal %T: %w", msg, err)
 	}
-	r := &kgo.Record{Topic: topic, Key: []byte(key), Value: b}
-	if tsNs > 0 {
-		r.Timestamp = time.Unix(0, tsNs)
-	}
-	return r, nil
+	return &kgo.Record{Topic: topic, Key: []byte(key), Value: b}, nil
 }
 
 // DeadLetterRecord wraps a failed record with the error that rejected it.

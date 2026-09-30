@@ -93,7 +93,7 @@ func (h *Handler) Handle(ctx context.Context, recs []*kgo.Record) ([]*kgo.Record
 			continue
 		}
 		for _, a := range h.engine(r.Partition).Evaluate(&m, r.Offset) {
-			rec, err := kafkax.ProtoRecord(h.OutTopic, a.Symbol, a, a.WindowEndNs)
+			rec, err := kafkax.ProtoRecord(h.OutTopic, a.Symbol, a)
 			if err != nil {
 				return nil, err
 			}
