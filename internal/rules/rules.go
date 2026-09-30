@@ -159,7 +159,8 @@ const (
 	OpLE Op = "<="
 )
 
-func (o Op) compare(a, b float64) bool {
+// Compare applies the operator: a <op> b.
+func (o Op) Compare(a, b float64) bool {
 	switch o {
 	case OpGT:
 		return a > b

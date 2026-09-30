@@ -153,7 +153,7 @@ func (e *Engine) Evaluate(m *domain.Metrics, offset int64) []*domain.Alert {
 }
 
 func (e *Engine) decide(r *Rule, m *domain.Metrics, exch string, v float64, info map[string]float64, ok bool) *domain.Alert {
-	fired := ok && r.Cond.Op.compare(v, r.Cond.Threshold)
+	fired := ok && r.Cond.Op.Compare(v, r.Cond.Threshold)
 	ck := r.Name + "|" + m.Symbol + "|" + exch
 	if fired {
 		if last, seen := e.cooldown[ck]; seen && m.WindowEndNs-last < int64(r.Cooldown) {
