@@ -1,0 +1,6 @@
+version: v2
+plugins:
+  # Writes internal/domain/tickstream.pb.go (path comes from go_package).
+  - local: protoc-gen-go
+    out: .
+    opt: module=github.com/anibitri/tickstream

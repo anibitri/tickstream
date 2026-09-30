@@ -1,0 +1,48 @@
+# Project spec (private working notes, not part of the repo)
+project-1-tickstream.md
+
+# Secrets / local env
+.env
+*.env.local
+
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+/build/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.terraform.lock.hcl.bak
+
+# Node / dashboard
+node_modules/
+dashboard/dist/
+dashboard/coverage/
+dashboard/test-results/
+dashboard/playwright-report/
+dashboard/blob-report/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Generated data (large fixtures, benchmark datasets, backtest outputs)
+/data/
+/reports/
+testdata/bench/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Failure files written by the rapid property-test library
+testdata/rapid/

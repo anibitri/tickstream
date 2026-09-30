@@ -1,0 +1,33 @@
+# Alert rules evaluated by risk-engine (and by the backtester).
+# Conditions use a fixed set of functions over metric fields:
+#   zscore(field, lookback=N)       (x − mean) / std over the previous N windows (current excluded)
+#   median_ratio(field, lookback=N)  x / median of the previous N windows
+#   abs(expr)
+# Fields: last_price, vwap, volume, trade_count, realised_vol, xex_spread_bps,
+#         high, low, range_bps, seconds_since_last_trade (evaluated per exchange)
+
+expected_exchanges: [coinbase, kraken]
+
+rules:
+  - name: price_jump
+    window_secs: 10
+    condition: abs(zscore(last_price, lookback=30)) > 4
+    severity: WARN
+    cooldown_secs: 60
+
+  - name: volume_spike
+    window_secs: 10
+    condition: median_ratio(volume, lookback=60) > 5
+    severity: WARN
+    cooldown_secs: 120
+
+  - name: cross_exchange_divergence
+    window_secs: 1
+    condition: abs(xex_spread_bps) > 25
+    severity: CRITICAL
+    cooldown_secs: 30
+
+  - name: stale_feed
+    condition: seconds_since_last_trade > 15
+    severity: CRITICAL
+    cooldown_secs: 60

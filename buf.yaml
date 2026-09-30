@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # Severity values mirror the spec (INFO/WARN/CRITICAL) instead of SEVERITY_INFO etc.
+    - ENUM_VALUE_PREFIX
+breaking:
+  use:
+    - FILE

@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package tickstream.v1;
+
+option go_package = "github.com/anibitri/tickstream/internal/domain;domain";
+
+// Trade is the canonical, exchange-agnostic trade record published to md.trades.
+message Trade {
+  string exchange = 1; // "coinbase" | "kraken"
+  string symbol = 2; // canonical, e.g. "BTC-USD"
+  string trade_id = 3; // exchange-native ID
+  int64 event_time_ns = 4; // exchange timestamp, UTC
+  int64 recv_time_ns = 5; // when the ingestor received it
+  string price = 6; // decimal string: never float for prices
+  string size = 7;
+  Side side = 8; // aggressor (taker) side
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_BUY = 1;
+  SIDE_SELL = 2;
+}
+
+// ExchangeStats is the per-exchange breakdown of a symbol window.
+message ExchangeStats {
+  string exchange = 1;
+  string vwap = 2;
+  string volume = 3;
+  int64 trade_count = 4;
+  int64 last_trade_ns = 5; // event time of the last trade from this exchange in the window
+}
+
+// Metrics is one record per symbol per closed window, published to md.metrics.
+message Metrics {
+  string symbol = 1;
+  int64 window_start_ns = 2;
+  int64 window_end_ns = 3;
+  int32 window_secs = 4; // 1, 10, 60
+  string vwap = 5;
+  string volume = 6;
+  int64 trade_count = 7;
+  double realised_vol = 8; // annualised, from log returns
+  string high = 9;
+  string low = 10;
+  double xex_spread_bps = 11; // cross-exchange divergence
+  int64 emitted_at_ns = 12;
+  string last_price = 13; // price of the last trade (by event time) in the window
+  repeated ExchangeStats exchanges = 14; // sorted by exchange name
+}
+
+message Alert {
+  string alert_id = 1; // deterministic hash(rule, symbol, window_end[, exchange])
+  string rule_name = 2;
+  string symbol = 3;
+  Severity severity = 4;
+  int64 window_end_ns = 5;
+  string message = 6;
+  map<string, double> values = 7;
+  string exchange = 8; // set for per-exchange rules (stale_feed, feed_gap)
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  WARN = 2;
+  CRITICAL = 3;
+}
+
+// FeedHealth is published periodically by the ingestor to md.feed_health.
+message FeedHealth {
+  string exchange = 1;
+  string symbol = 2;
+  int64 last_trade_ns = 3; // receive time of the last trade seen for this symbol
+  int64 reconnects = 4; // reconnects since ingestor start
+  FeedStatus status = 5;
+  int64 reported_at_ns = 6;
+}
+
+enum FeedStatus {
+  FEED_STATUS_UNSPECIFIED = 0;
+  FEED_STATUS_CONNECTED = 1;
+  FEED_STATUS_RECONNECTING = 2;
+  FEED_STATUS_STALE = 3;
+}
+
+// DeadLetter wraps an unprocessable message with the reason it was rejected.
+message DeadLetter {
+  string source_topic = 1;
+  int32 source_partition = 2;
+  int64 source_offset = 3;
+  string error = 4;
+  bytes payload = 5;
+  int64 failed_at_ns = 6;
+  string service = 7;
+}
