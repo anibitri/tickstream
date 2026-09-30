@@ -18,17 +18,16 @@ import (
 
 // Handler runs one rules Engine per assigned md.metrics partition.
 type Handler struct {
-	Set       *Set
-	InTopic   string // md.metrics or replay.<run_id>.metrics
-	OutTopic  string // risk.alerts or replay.<run_id>.alerts
-	DLQTopic  string
-	Tracer    trace.Tracer
-	Log       *slog.Logger
-	OnAlert   func(*domain.Alert) // optional hook (tests, backtests)
-	engines   map[int32]*Engine
-	mu        sync.Mutex
-	nowFn     func() time.Time
-	decodeErr int
+	Set      *Set
+	InTopic  string // md.metrics or replay.<run_id>.metrics
+	OutTopic string // risk.alerts or replay.<run_id>.alerts
+	DLQTopic string
+	Tracer   trace.Tracer
+	Log      *slog.Logger
+	OnAlert  func(*domain.Alert) // optional hook (tests, backtests)
+	engines  map[int32]*Engine
+	mu       sync.Mutex
+	nowFn    func() time.Time
 }
 
 func (h *Handler) engine(p int32) *Engine {

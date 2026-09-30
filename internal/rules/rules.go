@@ -311,7 +311,7 @@ func (p *parser) expr() (*Expr, error) {
 
 func isIdent(s string) bool {
 	for i, r := range s {
-		if !(r == '_' || unicode.IsLetter(r) || (i > 0 && unicode.IsDigit(r))) {
+		if r != '_' && !unicode.IsLetter(r) && (i == 0 || !unicode.IsDigit(r)) {
 			return false
 		}
 	}

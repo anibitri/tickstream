@@ -131,7 +131,7 @@ func TestWebsocketFiltersBySymbol(t *testing.T) {
 	a, srv := newTestAPI(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws?symbols=ETH-USD", nil)
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws?symbols=ETH-USD", nil) //nolint:bodyclose // the library closes it
 	require.NoError(t, err)
 	defer conn.CloseNow()
 

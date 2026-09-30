@@ -102,7 +102,7 @@ func (f *Feed) Run(ctx context.Context) error {
 func (f *Feed) session(ctx context.Context, disconnectedAtNs int64) (bool, error) {
 	name := f.Adapter.Name()
 	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	conn, _, err := websocket.Dial(dialCtx, f.Adapter.URL(), nil)
+	conn, _, err := websocket.Dial(dialCtx, f.Adapter.URL(), nil) //nolint:bodyclose // the library closes it
 	cancel()
 	if err != nil {
 		return false, fmt.Errorf("dial: %w", err)

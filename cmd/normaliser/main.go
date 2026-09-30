@@ -39,7 +39,7 @@ func main() {
 			RawPrefix:   cfg.RawPrefix,
 			TradesTopic: cfg.Trades,
 			DLQTopic:    cfg.DLQPrefix + "normaliser",
-			Allowed:     cfg.Symbols.Set(),
+			Allowed:     cfg.Set(),
 			Dedup:       NewDedupSet(cfg.DedupCapacity),
 			Tracer:      o.Tracer,
 			Log:         o.Log,

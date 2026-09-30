@@ -129,7 +129,7 @@ func main() {
 		os.Exit(1)
 	}
 	h := &Handler{
-		Alerts:     &storage.AlertsRepo{DB: storage.NewDynamoDB(ac), Table: cfg.Tables.Alerts},
+		Alerts:     &storage.AlertsRepo{DB: storage.NewDynamoDB(ac), Table: cfg.Alerts},
 		WebhookURL: cfg.WebhookURL,
 		HTTP:       &http.Client{Timeout: 5 * time.Second},
 		Log:        log,

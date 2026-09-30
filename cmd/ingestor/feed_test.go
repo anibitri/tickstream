@@ -145,7 +145,7 @@ func TestFeedPublishesTradesAndReconnectsWithGapAlert(t *testing.T) {
 
 	h := f.Health()
 	require.Len(t, h, 1)
-	assert.Equal(t, int64(f.reconnects.Load()), h[0].Reconnects)
+	assert.Equal(t, f.reconnects.Load(), h[0].Reconnects)
 	assert.NotZero(t, h[0].LastTradeNs)
 }
 
