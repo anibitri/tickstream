@@ -7,6 +7,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,6 +40,7 @@ type API struct {
 	History *History
 	Hub     *Hub
 	Ops     http.Handler // /metrics, /healthz, /readyz
+	Static  string       // folder with the built dashboard (empty: API only)
 	Log     *slog.Logger
 }
 
@@ -61,7 +64,27 @@ func (a *API) Router() http.Handler {
 		r.Handle("/healthz", a.Ops)
 		r.Handle("/readyz", a.Ops)
 	}
+	if a.Static != "" {
+		r.NotFound(spaHandler(a.Static))
+	}
 	return r
+}
+
+// spaHandler serves the dashboard's files, and index.html for any other path
+// so the single-page app can handle its own routes.
+func spaHandler(dir string) http.HandlerFunc {
+	files := http.FileServer(http.Dir(dir))
+	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		if _, err := os.Stat(filepath.Join(dir, filepath.Clean("/"+r.URL.Path))); err != nil {
+			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
+			return
+		}
+		files.ServeHTTP(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

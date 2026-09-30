@@ -29,6 +29,7 @@ type Config struct {
 	config.Tables
 	config.Symbols
 	APIAddr string `env:"API_ADDR" envDefault:":8080"`
+	Static  string `env:"DASHBOARD_DIR" envDefault:"/app/dashboard"`
 	Bucket  string `env:"ARCHIVE_BUCKET" envDefault:"tickstream-archive"`
 }
 
@@ -113,6 +114,7 @@ func main() {
 			History: hist,
 			Hub:     hub,
 			Ops:     o.Handler(),
+			Static:  cfg.Static,
 			Log:     o.Log,
 		}
 		srv := &http.Server{Addr: cfg.APIAddr, Handler: api.Router(), ReadHeaderTimeout: 5 * time.Second}

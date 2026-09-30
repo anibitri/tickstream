@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -162,4 +165,31 @@ func TestSlowClientDropsOldestMetricsButKeepsAlerts(t *testing.T) {
 	default:
 		t.Fatal("client that falls too far behind on alerts is disconnected")
 	}
+}
+
+func TestServesDashboardWithSPAFallback(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>app</html>"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.js"), []byte("console.log(1)"), 0o644))
+	a, _ := newTestAPI(t)
+	a.Static = dir
+	srv := httptest.NewServer(a.Router())
+	defer srv.Close()
+
+	body := func(path string) (int, string) {
+		res, err := http.Get(srv.URL + path)
+		require.NoError(t, err)
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	code, b := body("/app.js")
+	assert.Equal(t, 200, code)
+	assert.Equal(t, "console.log(1)", b)
+	_, b = body("/backtests/run-1") // a dashboard route
+	assert.Equal(t, "<html>app</html>", b)
+	code, _ = body("/api/v1/nope")
+	assert.Equal(t, 404, code, "unknown API paths stay 404s")
+	_, b = body("/../../etc/passwd")
+	assert.NotContains(t, b, "root:", "no escaping the folder")
 }
