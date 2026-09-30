@@ -4,6 +4,10 @@
 // and report.md locally and, when reading from S3, to backtests/<run_id>/.
 //
 //	backtester -from 2026-10-04T13:50:00Z -to 2026-10-04T14:10:00Z -dir testdata/archive -run-id fixture
+//
+// With -kafka-metrics it evaluates the windows a real metrics-engine wrote to
+// a replay topic instead of computing them itself. Comparing the two reports'
+// metrics_sha256 shows the Kafka path gives exactly the same output.
 package main
 
 import (
@@ -18,7 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/anibitri/tickstream/internal/config"
+	"github.com/anibitri/tickstream/internal/domain"
+	"github.com/anibitri/tickstream/internal/kafkax"
 	"github.com/anibitri/tickstream/internal/metrics"
 	"github.com/anibitri/tickstream/internal/replay"
 	"github.com/anibitri/tickstream/internal/rules"
@@ -32,6 +42,7 @@ type flags struct {
 	dir        string
 	rulesFile  string
 	outDir     string
+	kafkaTopic string
 	opts       Options
 	windowSecs []int32
 	lateness   time.Duration
@@ -46,6 +57,7 @@ func parseFlags(args []string) (flags, error) {
 	dir := fs.String("dir", "", "read the archive from this folder instead of S3")
 	rulesFile := fs.String("rules", "deploy/rules.yaml", "alert rules to evaluate")
 	outDir := fs.String("out", "reports", "local folder for report.json / report.md")
+	kafkaTopic := fs.String("kafka-metrics", "", "read metrics from this Kafka topic instead of computing them")
 	folds := fs.Int("folds", 5, "walk-forward blocks")
 	train := fs.Int("train", 2, "blocks used for tuning before each test block")
 	horizon := fs.Duration("horizon", 60*time.Second, "look-ahead for labelling true events")
@@ -56,7 +68,7 @@ func parseFlags(args []string) (flags, error) {
 	if err := fs.Parse(args); err != nil {
 		return flags{}, err
 	}
-	f := flags{runID: *runID, dir: *dir, rulesFile: *rulesFile, outDir: *outDir,
+	f := flags{runID: *runID, dir: *dir, rulesFile: *rulesFile, outDir: *outDir, kafkaTopic: *kafkaTopic,
 		windowSecs: []int32{1, 10, 60}, lateness: 500 * time.Millisecond,
 		opts: Options{Folds: *folds, TrainBlocks: *train, HorizonNs: int64(*horizon), EventBps: *eventBps,
 			Signal: SignalParams{Lookback: *lookback, HoldNs: int64(*hold), CostBps: *cost}}}
@@ -83,8 +95,9 @@ func parseFlags(args []string) (flags, error) {
 	return f, nil
 }
 
-// Backtest runs the whole evaluation and returns the report.
-func Backtest(ctx context.Context, store storage.ObjectStore, f flags) (*Report, error) {
+// Backtest runs the whole evaluation and returns the report. If fromKafka is
+// not nil, those windows are evaluated instead of recomputing them.
+func Backtest(ctx context.Context, store storage.ObjectStore, f flags, fromKafka []*domain.Metrics) (*Report, error) {
 	set, err := rules.Load(f.rulesFile)
 	if err != nil {
 		return nil, err
@@ -93,9 +106,14 @@ func Backtest(ctx context.Context, store storage.ObjectStore, f flags) (*Report,
 	if err != nil {
 		return nil, err
 	}
-	run, err := RunPipeline(r, metrics.Config{WindowSecs: f.windowSecs, AllowedLateness: f.lateness}, set)
+	run, err := replay.RunPipeline(r, metrics.Config{WindowSecs: f.windowSecs, AllowedLateness: f.lateness}, set)
 	if err != nil {
 		return nil, err
+	}
+	if fromKafka != nil {
+		kr := replay.RunFromMetrics(fromKafka, set)
+		kr.Trades, kr.InputSHA256 = run.Trades, run.InputSHA256
+		run = kr
 	}
 	if run.Trades == 0 {
 		return nil, errors.New("no trades in the selected range")
@@ -144,6 +162,7 @@ func main() {
 func run(ctx context.Context, f flags, log *slog.Logger) error {
 	var cfg struct {
 		config.AWS
+		config.Kafka
 		Bucket string `env:"ARCHIVE_BUCKET" envDefault:"tickstream-archive"`
 	}
 	if err := config.Load(&cfg); err != nil {
@@ -158,7 +177,16 @@ func run(ctx context.Context, f flags, log *slog.Logger) error {
 		store = &storage.S3Store{Client: storage.NewS3(ac, cfg.Endpoint), Bucket: cfg.Bucket}
 	}
 	start := time.Now()
-	rep, err := Backtest(ctx, store, f)
+	var fromKafka []*domain.Metrics
+	if f.kafkaTopic != "" {
+		ms, err := readMetricsTopic(ctx, cfg.Kafka, f.kafkaTopic)
+		if err != nil {
+			return err
+		}
+		log.Info("read metrics from kafka", "topic", f.kafkaTopic, "records", len(ms))
+		fromKafka = ms
+	}
+	rep, err := Backtest(ctx, store, f, fromKafka)
 	if err != nil {
 		return err
 	}
@@ -187,6 +215,44 @@ func run(ctx context.Context, f flags, log *slog.Logger) error {
 		}
 	}
 	log.Info("backtest finished", "run_id", f.runID, "trades", rep.Data.Trades, "windows", rep.Data.Windows,
-		"alerts", rep.Data.Alerts, "seconds", time.Since(start).Seconds(), "report", filepath.Join(dir, "report.md"))
+		"alerts", rep.Data.Alerts, "metrics_sha256", rep.Data.MetricsSHA256, "seconds", time.Since(start).Seconds(),
+		"report", filepath.Join(dir, "report.md"))
 	return nil
+}
+
+// readMetricsTopic reads every record currently in topic, from the first
+// offset to the end offset of each partition.
+func readMetricsTopic(ctx context.Context, kc config.Kafka, topic string) ([]*domain.Metrics, error) {
+	cl, err := kafkax.NewClient(kc, kgo.ConsumeTopics(topic), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
+	if err != nil {
+		return nil, err
+	}
+	defer cl.Close()
+	ends, err := kadm.NewClient(cl).ListEndOffsets(ctx, topic)
+	if err != nil {
+		return nil, err
+	}
+	remaining := map[int32]int64{}
+	ends.Each(func(o kadm.ListedOffset) {
+		if o.Offset > 0 {
+			remaining[o.Partition] = o.Offset
+		}
+	})
+	var out []*domain.Metrics
+	for len(remaining) > 0 {
+		fetches := cl.PollFetches(ctx)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		fetches.EachRecord(func(r *kgo.Record) {
+			var m domain.Metrics
+			if proto.Unmarshal(r.Value, &m) == nil {
+				out = append(out, &m)
+			}
+			if end, ok := remaining[r.Partition]; ok && r.Offset+1 >= end {
+				delete(remaining, r.Partition)
+			}
+		})
+	}
+	return out, nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anibitri/tickstream/internal/replay"
 	"github.com/anibitri/tickstream/internal/rules"
 )
 
@@ -98,7 +99,7 @@ func fmtTime(ns int64) string { return time.Unix(0, ns).UTC().Format(time.RFC333
 // equal blocks. For every block after the first TrainBlocks, parameters are
 // tuned on the TrainBlocks blocks just before it and then scored on that block
 // only, so no test result ever uses data that was seen during tuning.
-func Evaluate(run *Run, set *rules.Set, fromNs, toNs int64, o Options) (RuleResults []RuleOut, sig SignalOut) {
+func Evaluate(run *replay.Run, set *rules.Set, fromNs, toNs int64, o Options) (RuleResults []RuleOut, sig SignalOut) {
 	block := (toNs - fromNs) / int64(o.Folds)
 	blockStart := func(i int) int64 { return fromNs + int64(i)*block }
 	prices := buildPrices(run.Metrics)
@@ -109,14 +110,14 @@ func Evaluate(run *Run, set *rules.Set, fromNs, toNs int64, o Options) (RuleResu
 		}
 		var points []labelled
 		for _, e := range run.Evals {
-			if e.rule != r.Name || !e.defined {
+			if e.Rule != r.Name || !e.Defined {
 				continue
 			}
-			move, ok := futureMoveBps(prices[e.symbol], e.endNs, o.HorizonNs)
+			move, ok := futureMoveBps(prices[e.Symbol], e.EndNs, o.HorizonNs)
 			if !ok {
 				continue
 			}
-			points = append(points, labelled{e.symbol, e.endNs, e.value, move >= o.EventBps})
+			points = append(points, labelled{e.Symbol, e.EndNs, e.Value, move >= o.EventBps})
 		}
 		sort.SliceStable(points, func(i, j int) bool { return points[i].endNs < points[j].endNs })
 
@@ -137,7 +138,7 @@ func Evaluate(run *Run, set *rules.Set, fromNs, toNs int64, o Options) (RuleResu
 			fixed := scoreRule(points, r, r.Cond.Threshold, testFrom, testTo)
 			out.OutOfSampleTuned.add(test)
 			out.OutOfSampleFixed.add(fixed)
-			out.Folds = append(out.Folds, RuleFold{Fold: i, TestFrom: fmtTime(testFrom), Threshold: round6(best),
+			out.Folds = append(out.Folds, RuleFold{Fold: i + 1, TestFrom: fmtTime(testFrom), Threshold: round6(best),
 				TrainF1: round6(bestF1), Test: test})
 		}
 		out.OutOfSampleTuned.finish()
@@ -159,7 +160,7 @@ func Evaluate(run *Run, set *rules.Set, fromNs, toNs int64, o Options) (RuleResu
 				bestK, bestSharpe = k, st.SharpePerTrade
 			}
 		}
-		fold := SignalFold{Fold: i, TestFrom: fmtTime(testFrom), KBps: bestK}
+		fold := SignalFold{Fold: i + 1, TestFrom: fmtTime(testFrom), KBps: bestK}
 		if bestK > 0 {
 			fold.TrainSharpe = round6(bestSharpe)
 			test := simulateSignal(bars, o.Signal, bestK, testFrom, testTo)

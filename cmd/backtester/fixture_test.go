@@ -56,14 +56,14 @@ func goldenLine(m *domain.Metrics) string {
 		fmt.Sprintf("%.9g", m.RealisedVol), fmt.Sprintf("%.6f", m.XexSpreadBps), strings.Join(ex, " "))
 }
 
-func runFixture(t *testing.T) *Run {
+func runFixture(t *testing.T) *replay.Run {
 	t.Helper()
 	f := fixtureFlags(t)
 	set, err := rules.Load(shippedRules)
 	require.NoError(t, err)
 	r, err := replay.Open(context.Background(), &storage.DirStore{Root: fixtureDir}, nil, f.from, f.to)
 	require.NoError(t, err)
-	run, err := RunPipeline(r, metrics.DefaultConfig(), set)
+	run, err := replay.RunPipeline(r, metrics.DefaultConfig(), set)
 	require.NoError(t, err)
 	return run
 }
@@ -100,9 +100,9 @@ func TestGoldenMetrics(t *testing.T) {
 func TestBacktestIsDeterministic(t *testing.T) {
 	f := fixtureFlags(t)
 	store := &storage.DirStore{Root: fixtureDir}
-	a, err := Backtest(context.Background(), store, f)
+	a, err := Backtest(context.Background(), store, f, nil)
 	require.NoError(t, err)
-	b, err := Backtest(context.Background(), store, f)
+	b, err := Backtest(context.Background(), store, f, nil)
 	require.NoError(t, err)
 	ja, _ := json.Marshal(a)
 	jb, _ := json.Marshal(b)
@@ -114,4 +114,26 @@ func TestBacktestIsDeterministic(t *testing.T) {
 		assert.Len(t, r.Folds, 3, "5 blocks, 2 for training -> 3 test folds")
 	}
 	assert.Contains(t, a.Markdown(), "| price_jump |")
+}
+
+// Evaluating metrics that "came from Kafka" (shuffled, with repeats, as after
+// a consumer restart) must give exactly the same report as computing them.
+func TestKafkaMetricsGiveTheSameReport(t *testing.T) {
+	f := fixtureFlags(t)
+	store := &storage.DirStore{Root: fixtureDir}
+	want, err := Backtest(context.Background(), store, f, nil)
+	require.NoError(t, err)
+
+	ms := runFixture(t).Metrics
+	shuffled := make([]*domain.Metrics, 0, len(ms)+100)
+	for i := len(ms) - 1; i >= 0; i-- { // reverse order: partitions interleave differently
+		shuffled = append(shuffled, ms[i])
+	}
+	shuffled = append(shuffled, ms[:100]...) // repeats
+	got, err := Backtest(context.Background(), store, f, shuffled)
+	require.NoError(t, err)
+
+	jw, _ := json.Marshal(want)
+	jg, _ := json.Marshal(got)
+	require.Equal(t, string(jw), string(jg))
 }

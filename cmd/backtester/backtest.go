@@ -1,106 +1,13 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"io"
 	"math"
 	"sort"
 	"strconv"
 
-	"github.com/twmb/franz-go/pkg/kgo"
-	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/anibitri/tickstream/internal/domain"
-	"github.com/anibitri/tickstream/internal/metrics"
 	"github.com/anibitri/tickstream/internal/rules"
 )
-
-// Partitions matches the md.trades / md.metrics topics. Trades are split the
-// same way Kafka splits them (by symbol), so each engine sees exactly what it
-// would see in production.
-const Partitions = 6
-
-// TradeSource yields trades in event-time order (replay.Reader).
-type TradeSource interface {
-	Next() (*domain.Trade, error)
-}
-
-// evalPoint is one rule evaluation captured from the risk engine.
-type evalPoint struct {
-	rule    string
-	symbol  string
-	endNs   int64
-	value   float64
-	defined bool
-}
-
-// Run is the output of pushing a trade stream through the engines.
-type Run struct {
-	Trades        int
-	Metrics       []*domain.Metrics // in emission order
-	Alerts        []*domain.Alert
-	Evals         []evalPoint
-	InputSHA256   string
-	MetricsSHA256 string
-}
-
-// RunPipeline feeds trades through the metrics engine and the rules engine,
-// one engine pair per partition, exactly like the live services. Windows that
-// are still open when the input ends are not emitted (the live system would
-// only emit them when later trades arrive).
-func RunPipeline(src TradeSource, mcfg metrics.Config, set *rules.Set) (*Run, error) {
-	part := kgo.StickyKeyPartitioner(nil).ForTopic("md.trades")
-	var (
-		mEngines [Partitions]*metrics.Engine
-		rEngines [Partitions]*rules.Engine
-		mOffsets [Partitions]int64
-		rOffsets [Partitions]int64
-	)
-	run := &Run{}
-	for p := range Partitions {
-		mEngines[p] = metrics.NewEngine(mcfg) // event clock: emitted_at = watermark
-		rEngines[p] = rules.NewEngine(set)
-		rEngines[p].Observer = func(e rules.Evaluation) {
-			if !e.Rule.PerExch {
-				run.Evals = append(run.Evals, evalPoint{e.Rule.Name, e.Metrics.Symbol, e.Metrics.WindowEndNs, e.Value, e.Defined})
-			}
-		}
-	}
-	in, out := sha256.New(), sha256.New()
-	det := proto.MarshalOptions{Deterministic: true}
-	for {
-		t, err := src.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		b, _ := det.Marshal(t)
-		in.Write(b)
-		run.Trades++
-		p := part.Partition(&kgo.Record{Key: []byte(t.Symbol)}, Partitions)
-		emitted, _, err := mEngines[p].Add(t, mOffsets[p], trace.SpanContext{})
-		if err != nil {
-			return nil, err
-		}
-		mOffsets[p]++
-		for _, e := range emitted {
-			m := e.Metrics
-			b, _ := det.Marshal(m)
-			out.Write(b)
-			run.Metrics = append(run.Metrics, m)
-			run.Alerts = append(run.Alerts, rEngines[p].Evaluate(m, rOffsets[p])...)
-			rOffsets[p]++
-		}
-	}
-	run.InputSHA256 = hex.EncodeToString(in.Sum(nil))
-	run.MetricsSHA256 = hex.EncodeToString(out.Sum(nil))
-	return run, nil
-}
 
 // priceSeries is the last price of every 1s window of one symbol.
 type priceSeries struct {
