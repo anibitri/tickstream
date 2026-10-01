@@ -16,7 +16,12 @@ on every push.
 
 ## 2. Walk-forward testing
 
-<!-- TODO(you): add a link to your portfolio paper on walk-forward methodology here. -->
+The same method (tune on a rolling window, score only on the period that
+follows, charge transaction costs) is used in my paper *Portfolio
+Construction: A Comparative Study*
+([code](https://github.com/anibitri/portfolio_construction)), which compares
+five allocation strategies on the Ken French 49-industry portfolios from 1995
+to 2026.
 
 Tuning a threshold on a whole dataset and then reporting results on that same
 dataset flatters it. Instead the time range is cut into equal blocks:
