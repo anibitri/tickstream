@@ -11,19 +11,6 @@ be replayed through the same code for backtesting.
 
 ![Dashboard: live BTC-USD price and VWAP, feed health, alerts and a backtest report](docs/dashboard.gif)
 
-## Things to change
-
-> Temporary checklist for the repo owner. Delete this section when done.
-
-- [ ] **Add repository secrets** (Settings → Secrets and variables → Actions):
-      `LOCALSTACK_AUTH_TOKEN` (needed by the `infra` and `integration` workflows)
-      and optionally `CODECOV_TOKEN` (coverage reports).
-- [ ] *Optional:* a Discord/Slack webhook in `.env` (`ALERT_WEBHOOK_URL`).
-- [ ] *Optional:* one-off real AWS deploy: edit [infra/aws.tfvars](infra/aws.tfvars)
-      (bucket name, budget email), `terraform apply -var-file=aws.tfvars`,
-      take screenshots, then `terraform destroy -var-file=aws.tfvars`.
-- [ ] *Optional:* your full name instead of `anibitri` in [LICENSE](LICENSE).
-
 ## How it works
 
 ```mermaid
@@ -80,6 +67,21 @@ are downloaded). Then open:
 | Kafka UI | http://localhost:8081 |
 
 `make down` stops everything. `make help` lists the other commands.
+
+### Optional extras
+
+- **Alert notifications:** put a Discord or Slack incoming-webhook URL in `.env`
+  (`ALERT_WEBHOOK_URL`) and every new alert is posted there.
+- **Real AWS:** the same Terraform can create the AWS resources in a real
+  account, while Kafka and the services stay local. Set a unique bucket name
+  and a budget-alert email in [infra/aws.tfvars](infra/aws.tfvars), then:
+
+  ```bash
+  make lambda
+  terraform -chdir=infra init
+  terraform -chdir=infra apply -var-file=aws.tfvars
+  terraform -chdir=infra destroy -var-file=aws.tfvars   # when you are done
+  ```
 
 ## Results
 
