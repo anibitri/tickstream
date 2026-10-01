@@ -97,5 +97,8 @@ LocalStack, the services, Prometheus, Grafana and Jaeger.
   trade can be followed from ingestor to alert in Jaeger (1% of trades are
   sampled).
 
-<!-- TODO(you): add a Jaeger trace screenshot here, e.g. ![Trace](trace.png) -->
+![One trade traced through ingestor, normaliser and metrics-engine in Jaeger](trace.png)
+
+*One Coinbase trade in Jaeger: received by the ingestor, normalised, then
+counted in the 1s window (closed 0.4 s later) and the 10s window (6.8 s later).*
 - **Logs:** structured JSON, with the trace ID on every line.
