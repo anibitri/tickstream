@@ -33,6 +33,14 @@ export interface Report {
   };
 }
 
+// Equity points for the chart: one per second (trades on different symbols can
+// exit at the same time, and the chart needs strictly increasing times).
+export function equityPoints(curve: { time_ns: number; equity: number }[]) {
+  const bySecond = new Map<number, number>();
+  for (const p of curve) bySecond.set(Math.round(p.time_ns / 1e9), p.equity);
+  return [...bySecond].sort((a, b) => a[0] - b[0]).map(([time, value]) => ({ time, value }));
+}
+
 export function ReportView({ report }: { report: Report }) {
   const s = report.signal.out_of_sample;
   const curve = report.signal.equity_curve ?? [];
@@ -78,7 +86,7 @@ export function ReportView({ report }: { report: Report }) {
       {curve.length > 1 ? (
         <Chart
           height={240}
-          lines={[{ label: "Equity", color: "#3ecf8e", points: curve.map((p) => ({ time: Math.round(p.time_ns / 1e9), value: p.equity })) }]}
+          lines={[{ label: "Equity", color: "#3ecf8e", points: equityPoints(curve) }]}
         />
       ) : (
         <div className="empty">Not enough trades for an equity curve</div>

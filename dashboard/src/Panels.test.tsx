@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { Alert } from "./api";
-import { ReportView, type Report } from "./Backtests";
+import { equityPoints, ReportView, type Report } from "./Backtests";
 import { AlertFeed, FeedHealth, MetricsTable } from "./Panels";
 
 const alerts: Alert[] = [
@@ -74,5 +74,16 @@ describe("ReportView", () => {
     expect(screen.getByText("price_jump")).toBeTruthy();
     expect(screen.getAllByText("50.0%").length).toBe(3); // precision twice + hit rate
     expect(screen.getByText("Not enough trades for an equity curve")).toBeTruthy();
+  });
+});
+
+describe("equityPoints", () => {
+  it("keeps one point per second, in time order", () => {
+    const pts = equityPoints([
+      { time_ns: 2e9, equity: 1.01 },
+      { time_ns: 1e9, equity: 1.0 },
+      { time_ns: 2e9, equity: 1.02 }, // two symbols exiting in the same second
+    ]);
+    expect(pts).toEqual([{ time: 1, value: 1.0 }, { time: 2, value: 1.02 }]);
   });
 });

@@ -20,10 +20,12 @@ interface Line {
 }
 
 // Chart draws one or more lines with TradingView's lightweight-charts.
-export function Chart({ lines, height = 320 }: { lines: Line[]; height?: number }) {
+// Chart is `height` pixels tall, or fills its container when height is omitted.
+export function Chart({ lines, height }: { lines: Line[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<"Line">[]>([]);
+  const fitted = useRef(false);
 
   useEffect(() => {
     if (!box.current) return;
@@ -39,6 +41,7 @@ export function Chart({ lines, height = 320 }: { lines: Line[]; height?: number 
       c.remove();
       chart.current = null;
       series.current = [];
+      fitted.current = false;
     };
   }, [height]);
 
@@ -50,9 +53,15 @@ export function Chart({ lines, height = 320 }: { lines: Line[]; height?: number 
       series.current.push(c.addSeries(LineSeries, { color: l.color, lineWidth: 2, title: l.label }));
     }
     lines.forEach((l, i) => series.current[i].setData(l.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.value }))));
+    // Show all the data once when it first arrives; after that, leave the
+    // zoom to the user.
+    if (!fitted.current && lines.some((l) => l.points.length > 1)) {
+      c.timeScale().fitContent();
+      fitted.current = true;
+    }
   }, [lines]);
 
-  return <div ref={box} className="chart" style={{ height }} />;
+  return <div ref={box} className="chart" style={height ? { height } : undefined} />;
 }
 
 export function PriceChart({ series, window }: { series: Metrics[]; window: number }) {

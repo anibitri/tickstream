@@ -90,7 +90,7 @@ h3 {
 .grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
   grid-template-areas:
     "chart health"
     "chart alerts"
@@ -138,6 +138,15 @@ h3 {
 
 .chart {
   width: 100%;
+  height: 320px;
+}
+.chart-panel {
+  display: flex;
+  flex-direction: column;
+}
+.chart-panel .chart {
+  flex: 1 1 auto;
+  min-height: 320px;
 }
 
 .empty,
@@ -185,6 +194,7 @@ td.warn {
 
 .health td {
   text-align: left;
+  white-space: normal;
 }
 .dot {
   display: inline-block;
@@ -242,8 +252,8 @@ td.warn {
 }
 .alerts li {
   display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 8px;
+  grid-template-columns: auto 1fr; /* time and severity, then the message underneath */
+  gap: 2px 8px;
   padding: 6px 0 6px 8px;
   border-left: 3px solid var(--muted);
   border-bottom: 1px solid var(--line);
@@ -267,6 +277,7 @@ td.warn {
   color: var(--muted);
 }
 .alerts .msg {
+  grid-column: 1 / -1;
   overflow-wrap: anywhere;
 }
 
