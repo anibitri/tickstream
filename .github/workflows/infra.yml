@@ -1,0 +1,52 @@
+name: infra
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      # TODO(you): add a LOCALSTACK_AUTH_TOKEN repository secret
+      # (Settings -> Secrets and variables -> Actions). Without it the plan
+      # step is skipped; the other checks still run.
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.4
+      - name: Build the Lambda zip
+        run: make lambda ARCH=amd64
+      - name: Format
+        run: terraform -chdir=infra fmt -check -recursive
+      - name: Validate
+        run: |
+          terraform -chdir=infra init -input=false
+          terraform -chdir=infra validate
+      - uses: terraform-linters/setup-tflint@v6
+      - name: TFLint
+        working-directory: infra
+        run: tflint --init && tflint
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          quiet: true
+          compact: true
+      - name: Plan against LocalStack
+        if: env.LOCALSTACK_AUTH_TOKEN != ''
+        run: |
+          docker run -d -p 4566:4566 -e LOCALSTACK_AUTH_TOKEN -e SERVICES=s3,dynamodb,sqs,sns,lambda,iam,sts,logs \
+            localstack/localstack:2026.08.5
+          for i in $(seq 60); do curl -sf localhost:4566/_localstack/health >/dev/null && break; sleep 2; done
+          terraform -chdir=infra plan -input=false -var-file=local.tfvars -var lambda_architecture=x86_64
