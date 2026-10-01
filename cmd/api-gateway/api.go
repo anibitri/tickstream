@@ -79,7 +79,10 @@ func spaHandler(dir string) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not found")
 			return
 		}
-		if _, err := os.Stat(filepath.Join(dir, filepath.Clean("/"+r.URL.Path))); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, filepath.Clean("/"+r.URL.Path))); err != nil || r.URL.Path == "/" {
+			// index.html must be re-checked on every load so a new build is
+			// picked up at once; the hashed files it points to can be cached.
+			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
 			return
 		}

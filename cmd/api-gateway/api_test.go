@@ -188,6 +188,10 @@ func TestServesDashboardWithSPAFallback(t *testing.T) {
 	assert.Equal(t, "console.log(1)", b)
 	_, b = body("/backtests/run-1") // a dashboard route
 	assert.Equal(t, "<html>app</html>", b)
+	res, err := http.Get(srv.URL + "/")
+	require.NoError(t, err)
+	res.Body.Close()
+	assert.Equal(t, "no-cache", res.Header.Get("Cache-Control"), "index.html is always re-checked")
 	code, _ = body("/api/v1/nope")
 	assert.Equal(t, 404, code, "unknown API paths stay 404s")
 	_, b = body("/../../etc/passwd")
