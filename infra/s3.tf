@@ -1,6 +1,7 @@
 # Parquet trade archive (trades/...) and backtest reports (backtests/...).
 
 resource "aws_s3_bucket" "archive" {
+  #checkov:skip=CKV_AWS_145:SSE-S3 (AES-256) instead of a customer-managed KMS key, which costs $1/month.
   #checkov:skip=CKV_AWS_144:Cross-region replication doubles storage cost; the archive can be rebuilt from exchanges.
   #checkov:skip=CKV_AWS_18:Access logging needs a second bucket; not worth it for a single-user archive.
   #checkov:skip=CKV2_AWS_62:No consumer needs S3 event notifications.
