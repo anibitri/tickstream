@@ -58,3 +58,24 @@ jobs:
         run: |
           pip install -q -r scripts/requirements.txt
           python scripts/reference_check.py
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - name: API types match the OpenAPI spec
+        run: npm run gen:api && git diff --exit-code src/schema.ts
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Smoke test (Playwright)
+        run: npx playwright install --with-deps chromium && npm run e2e
