@@ -74,6 +74,33 @@ drawdown and the equity curve.
 | **Ignoring costs** | Costs are charged on every fill |
 | **Selection bias**: picking the symbols or days that look good | Not solved automatically. Choose the date range *before* looking at results and report every run, not just the best one |
 
+## Results on one hour of live data
+
+The backtester was run on the hour the stack archived from the live feeds
+(1 October 2026, 14:45–15:45 UTC: 73,631 trades, 10,398 windows, 49 alerts).
+
+```bash
+backtester -from 2026-10-01T14:45:00Z -to 2026-10-01T15:45:00Z -run-id live-1h
+```
+
+| Rule | Precision | Recall | What happened |
+|---|---|---|---|
+| price_jump | 5% | 10% | Tuning chose the lowest threshold (z > 2): 37 alerts, 2 of them before a 20 bps move |
+| volume_spike | 0% | 0% | 27 alerts, none followed by a 20 bps move |
+| cross_exchange_divergence | – | 0% | The two exchanges never differed by more than 25 bps, so it never fired |
+
+| Signal | Trades | Hit rate | Mean return | Max drawdown |
+|---|---|---|---|---|
+| Mean reversion, 5 bps costs per fill | 28 | 0% | −13.3 bps | 3.7% |
+
+**How to read this.** One calm hour is far too little data to judge anything:
+only 21 windows were followed by a 20 bps move. Even so, two things are clear
+and expected. Volume spikes on their own say nothing about the next price move.
+And the signal's typical gross move is a few basis points, smaller than its 10
+bps round-trip cost, so it loses on every trade. The value of the exercise is
+that the whole loop (live feeds → archive → replay → walk-forward scores) works
+on real data, and gives the same answer every time it is run.
+
 ## The bundled fixture
 
 `testdata/archive` is 20 minutes of synthetic data: a random walk with a few

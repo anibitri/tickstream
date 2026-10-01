@@ -1,6 +1,6 @@
 # Benchmarks
 
-All numbers are measured, not estimated. Anything not measured yet says so.
+All numbers are measured, not estimated.
 
 **Machine:** Apple M2 (8 cores), 8 GB RAM, macOS 26, Go 1.27. Docker Desktop
 has 6 GB of memory; the whole stack (Kafka, LocalStack, Prometheus, Grafana,
@@ -53,10 +53,30 @@ is limited by producing, not by processing.
 
 ## Latency
 
-*Not measured yet.* It needs the live feeds running for about an hour: the
-Grafana panel "Receive → metric published" shows p50/p95/p99 of the time from
-the ingestor receiving the trade that closes a window to that window's metrics
-being published.
+Measured live for one hour (1 October 2026, 14:45–15:45 UTC) with Coinbase
+and Kraken feeds for BTC-USD, ETH-USD and SOL-USD: 67,474 trade messages.
+
+| Path | p50 | p95 | p99 |
+|---|---|---|---|
+| Ingestor receives a trade → canonical trade published (normaliser) | 4.3 ms | 11.3 ms | 27.2 ms |
+| **Ingestor receives the trade that closes a window → that window's metrics published** | **9.6 ms** | **19.6 ms** | **31.7 ms** |
+| Window ends → its metrics published | 0.74 s | 2.3 s | 3.8 s |
+
+The second row is the spec's target (p99 under 50 ms): it covers ingestor,
+Kafka, normaliser, Kafka and metrics-engine. The last row is longer by design:
+every window waits 500 ms for late trades, and a quiet symbol's window is only
+closed when its next trade arrives or, after 2 s of silence, by the clock.
+
+Notes:
+- Percentiles come from Prometheus histograms with buckets that double in size
+  (…, 8, 16, 32, 64 ms), so values are interpolated within a bucket.
+- 646 trades (about 1%) arrived after their window had closed and were left
+  out of the metrics (they are still archived). Most are Kraken's snapshot of
+  recent trades sent on reconnect, plus small clock differences between the
+  two exchanges.
+- Both feeds dropped once at the same moment (15:40, about 31 s) because of a
+  break in the local internet connection. Each reconnected on its own and raised
+  `feed_gap` alerts.
 
 ## Recovery (chaos experiments)
 
