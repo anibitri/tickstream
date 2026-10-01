@@ -43,6 +43,7 @@ testdata/bench/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # Failure files written by the rapid property-test library
 testdata/rapid/

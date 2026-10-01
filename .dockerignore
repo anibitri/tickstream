@@ -1,0 +1,14 @@
+# Keep the Docker build context small (and never ship local secrets).
+.git
+.env
+.venv
+**/node_modules
+dashboard/dist
+dashboard/test-results
+dashboard/playwright-report
+build
+reports
+data
+**/.terraform
+*.tfstate*
+project-1-tickstream.md
