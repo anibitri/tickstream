@@ -116,8 +116,8 @@ func main() {
 	var cfg struct {
 		config.AWS
 		config.Tables
-		// TODO(you, optional): set ALERT_WEBHOOK_URL to a Discord or Slack
-		// incoming-webhook URL (in .env, passed to the Lambda by Terraform).
+		// Optional Discord or Slack incoming-webhook URL (set in .env and
+		// passed to the Lambda by Terraform).
 		WebhookURL string `env:"ALERT_WEBHOOK_URL"`
 	}
 	config.MustLoad(&cfg)

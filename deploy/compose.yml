@@ -68,7 +68,7 @@ services:
     image: localstack/localstack:2026.08.5
     environment:
       SERVICES: s3,dynamodb,sqs,sns,lambda,iam,sts,logs
-      # TODO(you): paste your LocalStack auth token into .env (LOCALSTACK_AUTH_TOKEN=...).
+      # Your LocalStack auth token, from .env (LOCALSTACK_AUTH_TOKEN=...).
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
       LAMBDA_DOCKER_NETWORK: tickstream_default
     ports: ["4566:4566"]

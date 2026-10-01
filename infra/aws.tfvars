@@ -3,10 +3,10 @@
 # `terraform destroy -var-file=aws.tfvars` when you are done.
 env = "aws-sandbox"
 
-# TODO(you): bucket names are global, so pick a unique one.
+# Bucket names are global, so pick a unique one.
 archive_bucket = "tickstream-archive-CHANGE-ME"
 
-# TODO(you): the budget email gets an alert at 80% of this monthly amount.
+# This address gets an email when the bill reaches 80% of this monthly amount.
 monthly_budget_usd = 5
 budget_email       = "you@example.com"
 

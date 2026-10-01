@@ -6,6 +6,7 @@ on:
     paths: ["infra/**", ".github/workflows/infra.yml"]
   pull_request:
     paths: ["infra/**", ".github/workflows/infra.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,9 +15,8 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     env:
-      # TODO(you): add a LOCALSTACK_AUTH_TOKEN repository secret
-      # (Settings -> Secrets and variables -> Actions). Without it the plan
-      # step is skipped; the other checks still run.
+      # Repository secret. Without it the plan step is skipped and the other
+      # checks still run.
       LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
