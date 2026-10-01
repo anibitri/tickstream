@@ -28,6 +28,9 @@ import (
 
 func startLocalStack(t *testing.T) config.AWS {
 	t.Helper()
+	if os.Getenv("LOCALSTACK_AUTH_TOKEN") == "" {
+		t.Skip("LOCALSTACK_AUTH_TOKEN is not set (LocalStack needs one to start)")
+	}
 	ctx := context.Background()
 	// A plain container: the testcontainers LocalStack module can't parse
 	// LocalStack's calendar version tags (2026.08.5).
